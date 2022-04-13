@@ -1,0 +1,198 @@
+#!/bin/bash
+
+hash truncate 2>/dev/null || { echo >&2 "I require truncate but it's not installed. Aborting."; exit 1; }
+hash stat 2>/dev/null || { echo >&2 "I require stat but it's installed. Aborting."; exit 1; }
+
+INSTALLDIR=~/.sdrs13
+RESERVEFILE=~/.sdrs13/reserve.dat
+LOGFILE=~/.sdrs13/reserve.log
+
+#if [ "$EUID" -ne 0 ]
+#  then
+#  echo -e "Hi $(whoami)! Please run this script as root."
+#  exit 1
+#fi
+
+SCRIPTNAME=$(basename "$0")
+
+echo -e "Strategic Disk Space Reserve v1.00.- (c) 2022 Jose Juan Rodriguez.-"
+
+Help()
+{
+   echo -e "\nUsage: $0 -i -h -l -c size[KMG] -m [+-]size[KMG]"
+   echo -e "\t-h Print usage information."
+   echo -e "\t-i Print information about the Strategic Disk Space Reserve."
+   echo -e "\t-l Show past activity saved in log file."
+   echo -e "\t-c Create reserved space. You can specify K (Kb), M (mega) or G (giga)"
+   echo -e "\t-m Expand or shrink the Strategic Disk Space Reserve."
+   echo -e "\t   You can use + to expand or - to shrink. See examples."
+   echo -e "\t-a Release ALL the space reserved\n"
+   echo -e "Examples: $0 -i               Print information"
+   echo -e "          $0 -l               Show log file"
+   echo -e "          $0 -c 3G            Reserve 3Gb of space"
+   echo -e "          $0 -a               Release ALL the reserved space"
+   echo -e "          $0 -m +1G           Expand the reserve 1G."
+   echo -e "          $0 -m -1G           Shrink the reserve 1G.\n"
+   exit 0
+}
+
+if [ $# -eq 0 ]; then
+    if [ ! -d "$INSTALLDIR" ]; then
+       echo -e "$SCRIPTNAME isn't installed in this system\n"
+    fi
+    Help
+    exit 0
+fi
+
+while [ -n "$1" ]
+do
+case "$1" in
+   -h) Help
+       shift ;;
+
+   -l) if [ -f "$LOGFILE" ]; then
+          cat "$LOGFILE"
+       fi
+       exit 0
+       ;;
+
+   -m) if [ -f "$RESERVEFILE" ]; then
+          RESERVESIZE=$(ls -nh "$RESERVEFILE" | cut -d " " -f5)
+          echo -e "\nThere is a reserve available of $RESERVESIZE"
+          PARAM="$2"
+          # Get the parameter's number
+          NUMBER="${PARAM//[!0-9]/}"
+          PLENGHT="${#PARAM}"
+          NLENGHT="${#NUMBER}"
+          OPERATOR=${PARAM:0:1}
+
+          if [ "$PLENGHT" -ne $((NLENGHT + 2)) ]; then
+             echo -e "\nWrong parameter in -m option.\n"
+             echo -e "     - Unit should be K, M or G"
+             echo -e "     - Operator should be + or -\n"
+             exit 1
+          fi
+
+          if [ "$NLENGHT" -eq 0 ]; then
+             echo -e "\nWrong parameter in -m option. Missing size of reserved space.\n"
+             exit 1
+          fi
+
+          if [ "$OPERATOR" == "+" ] || [ "$OPERATOR" == "-" ]; then
+
+             if [ "$OPERATOR" == "+" ]; then
+
+                echo "Expanding. Wait a moment..."
+                if head -c "$PARAM" /dev/urandom >> "$RESERVEFILE" 2>/dev/null; then
+                   NEWSIZE=$(ls -nh "$RESERVEFILE" | cut -d " " -f5)
+                   echo -e "Space reserve was expanded from $RESERVESIZE to $NEWSIZE."
+                   echo "$(date) EXPAND $RESERVESIZE -> $NEWSIZE" >> "$LOGFILE"
+                else
+                   echo -e "An error have been detected. No reserve was created.\n"
+                fi
+             fi
+
+
+             if [ "$OPERATOR" == "-" ]; then
+
+                 echo "Shrinking. Wait a moment..."
+                if truncate -s "$PARAM" "$RESERVEFILE" 2>/dev/null; then
+                   NEWSIZE=$(ls -nh "$RESERVEFILE" | cut -d " " -f5)
+                   echo -e "Space reserve was shrinked from $RESERVESIZE to $NEWSIZE."
+                   echo "$(date) SHRINK $RESERVESIZE -> $NEWSIZE" >> "$LOGFILE"
+                else
+                   echo -e "An error have been detected. No reserve was created.\n"
+                fi
+             fi
+
+          else
+             echo -e "Wrong parameter. Option -m must start with + or -\n"
+             exit 1
+          fi
+          exit 0
+       else
+          echo -e "There isn't reserved space in this system"
+          echo -e "You can't modify a reserve that doesn't exist\n"
+          exit 1
+       fi
+       exit 0
+       ;;
+
+   -c) PARAM="$2"
+       # Get the parameter's number
+       NUMBER="${PARAM//[!0-9]/}"
+       PLENGHT="${#PARAM}"
+       NLENGHT="${#NUMBER}"
+       # Get unit (K,M,G)
+       # UNIT="${PARAM: -1}"
+
+       if [ "$PLENGHT" -ne $((NLENGHT + 1)) ]; then
+          echo -e "\nWrong parameter in -c option. Unit should be K, M or G\n"
+          exit 1
+       fi
+
+       if [ "$NLENGHT" -eq 0 ]; then
+          echo -e "\nWrong parameter in -c option. Missing size of reserved space.\n"
+          exit 1
+       fi
+
+       if [ ! -d "$INSTALLDIR" ]; then
+          mkdir "$INSTALLDIR"
+          echo "$(date) INSTALLED" >> "$LOGFILE"
+       fi
+       echo -e "\nWait a moment, please. I am creating the space reserve...\n"
+       if head -c "$PARAM" /dev/urandom > "$RESERVEFILE" 2>/dev/null; then
+          echo -e "Space reserve was created. $PARAM have been reserved."
+          echo "$(date) CREATE $PARAM" >> "$LOGFILE"
+       else
+          echo -e "An error have been detected. No reserve was created.\n"
+       fi
+       exit 0
+       ;;
+
+   -i) if [ ! -d "$INSTALLDIR" ]; then
+          echo -e "$SCRIPTNAME isn't installed in this system"
+       fi
+       DISKDATA=$(df -h / | sed 1d | tr -s " ")
+       DEVICE=$(echo "$DISKDATA" | cut -d " " -f1)
+       TOTAL=$(echo "$DISKDATA" | cut -d " " -f2)
+       USED=$(echo "$DISKDATA" | cut -d " " -f3)
+       AVAIL=$(echo "$DISKDATA" | cut -d " " -f4)
+       PUSED=$(echo "$DISKDATA" | cut -d " " -f5)
+       PUNUSED=$((100 - "${PUSED//[!0-9]/}"))
+       echo -e "\n$DEVICE -> Disk capacity: $TOTAL  Used: $USED ($PUSED)  Available: $AVAIL ($PUNUSED%)\n"
+       if [ -f "$RESERVEFILE" ]; then
+          stat --printf='Owner: %U\nSize: %s bytes\nLastStatChange: %z\nModified : %y\nAccessed: %x\n' "$RESERVEFILE"
+          RESERVESIZE=$(ls -nh "$RESERVEFILE" | cut -d " " -f5)
+          echo -e "There is a reserve of $RESERVESIZE available."
+          echo -e "Use $SCRIPTNAME -m to release space or $SCRIPTNAME -a to release all the space reserved.\n"
+       else
+          echo -e "There isn't reserved space in this system\n"
+       fi
+       exit 0
+       ;;
+
+   -a) if [ -f "$RESERVEFILE" ]; then
+          RESERVESIZE=$(ls -nh "$RESERVEFILE" | cut -d " " -f5)
+          if rm -f "$RESERVEFILE";
+          then
+            echo -e "There is a reserve available of $RESERVESIZE"
+            echo -e "The whole reserve was released.\n"
+            echo "$(date) (-a) RELEASE ALL" >> "$LOGFILE"
+          fi
+          sync
+       else
+          echo -e "There isn't reserved space in this system\n"
+       fi
+       exit 0
+       ;;
+
+    --) Help
+       shift
+       break ;;
+
+    *) echo -e "\nSorry, $1 is not an option"
+       Help ;;
+esac
+shift
+done
