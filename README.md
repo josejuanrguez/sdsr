@@ -7,4 +7,4 @@ Features:
 
 - You can create, expand or shrink a disk space reserve.
 - You can get information about current disk space reserve.
-- Data transfer rate and bytes trandfered indicator.
+- Data transfer rate and bytes transfered indicator.
