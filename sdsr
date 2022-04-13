@@ -2,6 +2,7 @@
 
 hash truncate 2>/dev/null || { echo >&2 "I require truncate but it's not installed. Aborting."; exit 1; }
 hash stat 2>/dev/null || { echo >&2 "I require stat but it's installed. Aborting."; exit 1; }
+hash pv 2>/dev/null || { echo >&2 "I require pv but it's installed. Aborting."; exit 1; }
 
 INSTALLDIR=~/.sdrs13
 RESERVEFILE=~/.sdrs13/reserve.dat
@@ -83,9 +84,10 @@ case "$1" in
              if [ "$OPERATOR" == "+" ]; then
 
                 echo "Expanding. Wait a moment..."
-                if head -c "$PARAM" /dev/urandom >> "$RESERVEFILE" 2>/dev/null; then
+
+                if pv -F'Transfer rate: %r   Bytes transfered: %b' /dev/urandom | head -c "$PARAM" >> "$RESERVEFILE" 2>/dev/null; then
                    NEWSIZE=$(ls -nh "$RESERVEFILE" | cut -d " " -f5)
-                   echo -e "Space reserve was expanded from $RESERVESIZE to $NEWSIZE."
+                   echo -e "Space reserve was expanded from $RESERVESIZE to $NEWSIZE.\n"
                    echo "$(date) EXPAND $RESERVESIZE -> $NEWSIZE" >> "$LOGFILE"
                 else
                    echo -e "An error have been detected. No reserve was created.\n"
@@ -126,6 +128,11 @@ case "$1" in
        # Get unit (K,M,G)
        # UNIT="${PARAM: -1}"
 
+       if [ -f "$RESERVEFILE" ]; then
+          echo -e "There is a reserve created already. Please, use -m option to modify it.\n"
+          exit 1
+       fi
+
        if [ "$PLENGHT" -ne $((NLENGHT + 1)) ]; then
           echo -e "\nWrong parameter in -c option. Unit should be K, M or G\n"
           exit 1
@@ -141,7 +148,7 @@ case "$1" in
           echo "$(date) INSTALLED" >> "$LOGFILE"
        fi
        echo -e "\nWait a moment, please. I am creating the space reserve...\n"
-       if head -c "$PARAM" /dev/urandom > "$RESERVEFILE" 2>/dev/null; then
+       if pv -F'Transfer rate: %r   Bytes transfered: %b' /dev/urandom | head -c "$PARAM" > "$RESERVEFILE" 2>/dev/null; then
           echo -e "Space reserve was created. $PARAM have been reserved."
           echo "$(date) CREATE $PARAM" >> "$LOGFILE"
        else
