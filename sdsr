@@ -1,8 +1,8 @@
 #!/bin/bash
 
 hash truncate 2>/dev/null || { echo >&2 "I require truncate but it's not installed. Aborting."; exit 1; }
-hash stat 2>/dev/null || { echo >&2 "I require stat but it's installed. Aborting."; exit 1; }
-hash pv 2>/dev/null || { echo >&2 "I require pv but it's installed. Aborting."; exit 1; }
+hash stat 2>/dev/null || { echo >&2 "I require stat but it's not installed. Aborting."; exit 1; }
+hash pv 2>/dev/null || { echo >&2 "I require pv but it's not installed. Aborting."; exit 1; }
 
 INSTALLDIR=~/.sdrs13
 RESERVEFILE=~/.sdrs13/reserve.dat
